@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from .serializers import AssemblyLogSerializer
+from .serializers import AssemblyLogSerializer, QALogSerializer
 
 
 @api_view(["POST"])
@@ -21,3 +21,20 @@ def assemble_component(request):
         {"status": "Success", "message": "Component assembled", "log_id": log.id},
         status=status.HTTP_201_CREATED,
     )
+
+@api_view(["POST"])
+def verify_component(request):
+    serializer = QALogSerializer(data=request.data)
+
+    if not serializer.is_valid():
+        return Response(
+            {"status": "Failure", "errors": serializer.errors},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    log = serializer.save()
+    return Response(
+        {"status": "Success", "message": "Verification saved", "log_id": log.id},
+        status=status.HTTP_201_CREATED,
+    )
+
