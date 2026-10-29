@@ -16,7 +16,7 @@ class QALogSerializer(serializers.ModelSerializer):
     ComponentID = serializers.CharField(source="component_id", max_length=50)
     VerificationStatus = serializers.ChoiceField(
         source="verification_status",
-        choices=["PASS", "FAIL"],
+        choices=QALog.VERIFICATION_CHOICES,
     )
 
     class Meta:

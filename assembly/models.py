@@ -11,8 +11,8 @@ class AssemblyLog(models.Model):
 
 class QALog(models.Model):
     VERIFICATION_CHOICES = [
-        ('Pass', 'Pass'),
-        ('Fail', 'Fail'),      
+        ('PASS', 'Pass'),
+        ('FAIL', 'Fail'),      
     ]
 
     mobile_base_id = models.CharField(max_length=50)
