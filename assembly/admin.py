@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AssemblyLog, CloudData, MobileBase, QALog, SCADALog, UserProfile
+from .models import AssemblyLog, CloudData, MacMini, MobileBase, QALog, SCADALog, UserProfile
 
 
 @admin.register(MobileBase)
@@ -31,6 +31,12 @@ class SCADALogAdmin(admin.ModelAdmin):
 class CloudDataAdmin(admin.ModelAdmin):
     list_display = ["id", "mobile_base_id", "entry_type", "sync_status", "entry_time"]
     list_filter = ["entry_type", "sync_status"]
+
+
+@admin.register(MacMini)
+class MacMiniAdmin(admin.ModelAdmin):
+    list_display = ["mac_mini_id", "assembly_area_id", "cloud_integration_status", "last_sync_time"]
+    list_filter = ["assembly_area_id", "cloud_integration_status"]
 
 
 @admin.register(UserProfile)

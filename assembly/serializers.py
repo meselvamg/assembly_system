@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import AssemblyLog, CloudData, QALog, SCADALog
+from .models import AssemblyLog, CloudData, MacMini, QALog, SCADALog
 
 
 
@@ -52,6 +52,16 @@ class CloudReportSerializer(serializers.ModelSerializer):
         model = CloudData
         fields = ["id", "MobileBaseID", "EntryType", "entry_time", "sync_status"]
         read_only_fields = ["id", "entry_time", "sync_status"]
+
+
+class MacMiniSerializer(serializers.ModelSerializer):
+    MacMiniID = serializers.CharField(source="mac_mini_id", max_length=50)
+    AssemblyAreaID = serializers.CharField(source="assembly_area_id", max_length=50)
+
+    class Meta:
+        model = MacMini
+        fields = ["id", "MacMiniID", "AssemblyAreaID", "cloud_integration_status", "last_sync_time"]
+        read_only_fields = ["id", "cloud_integration_status", "last_sync_time"]
 
 
 class LoginSerializer(serializers.Serializer):
