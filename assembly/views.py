@@ -7,9 +7,10 @@ from django.db.models import Count
 from django.shortcuts import render
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 
 from .cloud import ENTRY_SOURCES, build_payload, send_to_cloud
 from .models import AssemblyLog, CloudData, MobileBase, QALog, SCADALog
@@ -117,16 +118,26 @@ def report_to_cloud(request):
              "sync_status": entry.sync_status},
             status=status.HTTP_502_BAD_GATEWAY,
         )
+    if entry.sync_status == "PENDING":
+        message = "Saved, waiting for cloud (CLOUD_API_URL not set)"
+    else:
+        message = "Reported to cloud"
     return Response(
-        {"status": "Success", "message": "Reported to cloud", "entry_id": entry.id,
+        {"status": "Success", "message": message, "entry_id": entry.id,
          "sync_status": entry.sync_status},
         status=status.HTTP_201_CREATED,
     )
 
 
+class LoginRateThrottle(AnonRateThrottle):
+    """Limit login attempts per IP to slow down password guessing."""
+    scope = "login"
+
+
 @api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def authorize_user(request):
     serializer = LoginSerializer(data=request.data)
 

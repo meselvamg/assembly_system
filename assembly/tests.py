@@ -2,6 +2,7 @@ from unittest.mock import patch
 from urllib.error import URLError
 
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -123,6 +124,7 @@ class ReportToCloudTests(TestCase):
         response = self.client.post(self.url, {"MobileBaseID": "MB001", "EntryType": "ASSEMBLY"}, format="json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["sync_status"], "PENDING")
+        self.assertIn("waiting for cloud", response.data["message"])
         self.assertEqual(CloudData.objects.get().sync_status, "PENDING")
 
     @patch("assembly.views.send_to_cloud", return_value="SENT")
@@ -168,6 +170,7 @@ class SendToCloudRetryTests(TestCase):
 
 class AuthorizationTests(TestCase):
     def setUp(self):
+        cache.clear()  # reset the login throttle between tests
         self.client = APIClient()
         make_user("operator", "OPERATOR")
 
@@ -178,6 +181,14 @@ class AuthorizationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["user_type"], "OPERATOR")
         self.assertTrue(response.data["token"])
+
+    def test_login_is_rate_limited(self):
+        for _ in range(5):
+            self.client.post("/api/authorize_user/", {"Username": "operator", "Password": "wrong"}, format="json")
+        response = self.client.post(
+            "/api/authorize_user/", {"Username": "operator", "Password": "pass1234"}, format="json"
+        )
+        self.assertEqual(response.status_code, 429)
 
     def test_wrong_password_returns_401(self):
         response = self.client.post(
@@ -267,6 +278,9 @@ class DashboardPageTests(TestCase):
 
 @override_settings(CORS_ALLOWED_ORIGINS=["http://127.0.0.1:5500"])
 class FrontendCorsTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
     def test_preflight_from_frontend_is_allowed(self):
         response = self.client.options(
             "/api/assemble_component/",

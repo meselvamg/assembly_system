@@ -68,6 +68,7 @@ All endpoints are under `/api/`, accept and return JSON, and respond with `{"sta
 ```
 `200` → `{"status": "Success", "token": "9f2c...", "user_type": "OPERATOR"}`
 `401` → invalid username or password
+`429` → more than 5 login attempts per minute from the same IP
 
 Send the token on every other request:
 ```
@@ -102,7 +103,7 @@ Authorization: Token 9f2c...
 | Result | Response |
 |---|---|
 | Sent | `201`, `sync_status: "SENT"` |
-| No `CLOUD_API_URL` configured | `201`, `sync_status: "PENDING"` |
+| No `CLOUD_API_URL` configured | `201`, `sync_status: "PENDING"`, message "Saved, waiting for cloud" |
 | Cloud unreachable after retries | `502`, `sync_status: "FAILED"` (entry kept for retry) |
 | No records of that type for the base | `400` |
 
@@ -188,7 +189,7 @@ Events and errors are written to the console and to `logs/assembly.log` (rotated
 python manage.py test assembly
 ```
 
-28 tests cover every endpoint: valid and invalid input, role checks, token login, cloud push success, failure and retry, the dashboard summary, the dashboard page login flow, and CORS for the frontend.
+29 tests cover every endpoint: valid and invalid input, role checks, token login, login rate limiting, cloud push success, failure and retry, the dashboard summary, the dashboard page login flow, and CORS for the frontend.
 
 ## Project structure
 
