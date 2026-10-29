@@ -150,6 +150,12 @@ REST_FRAMEWORK = {
 }
 
 
+# Dashboard login (session based, separate from the API tokens)
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard'
+LOGOUT_REDIRECT_URL = 'login'
+
+
 # Cloud reporting (set CLOUD_API_URL env var to enable pushes; empty keeps entries PENDING)
 CLOUD_API_URL = os.environ.get('CLOUD_API_URL', '')
 CLOUD_MAX_RETRIES = 3

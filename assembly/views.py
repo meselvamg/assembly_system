@@ -1,8 +1,10 @@
 import logging
 
 from django.contrib.auth import authenticate
+from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count
+from django.shortcuts import render
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view, authentication_classes, permission_classes
@@ -187,3 +189,13 @@ def dashboard_data(request):
         },
         "mobile_bases": bases,
     })
+
+
+@login_required
+def dashboard_page(request):
+    profile = getattr(request.user, "profile", None)
+    if profile:
+        user_type = profile.get_user_type_display()
+    else:
+        user_type = "Admin" if request.user.is_superuser else ""
+    return render(request, "assembly/dashboard.html", {"user_type": user_type})

@@ -1,0 +1,210 @@
+{% extends "assembly/base.html" %}
+
+{% block head %}
+<style>
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  header h1 { font-size: 22px; margin: 0; }
+  .meta { color: var(--ink-2); font-size: 13px; }
+  .user { display: flex; gap: 12px; align-items: center; font-size: 14px; }
+  .user form { margin: 0; }
+
+  .banner { display: none; margin-bottom: 16px; border-left: 4px solid var(--critical); }
+  .banner.show { display: block; }
+
+  .tiles, .panels { display: grid; gap: 16px; margin-bottom: 16px; }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+  .panels { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .tile .label { color: var(--ink-2); font-size: 13px; }
+  .tile .value { font-size: 32px; font-weight: 600; line-height: 1.2; margin-top: 4px; }
+  .tile .hint { color: var(--muted); font-size: 13px; }
+
+  h2 { font-size: 15px; margin: 0 0 14px; }
+  .bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: var(--grid); }
+  .bar span { min-width: 4px; }
+  .legend { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; }
+  .legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .legend .count { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .empty { color: var(--muted); font-size: 14px; }
+
+  .icon {
+    display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%;
+    font-size: 11px; font-weight: 700; color: #fff; flex: none;
+  }
+  .icon.warning { color: #0b0b0b; }
+  .icon.good { background: var(--good); }
+  .icon.warning { background: var(--warning); }
+  .icon.critical { background: var(--critical); }
+  .icon.info { background: var(--accent); }
+  .icon.neutral { background: var(--neutral); color: var(--ink); }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th { color: var(--ink-2); font-weight: 500; font-size: 13px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Mobile Manufacturing Assembly &amp; QA Platform</h1>
+      <div class="meta"><span id="updated">Loading…</span> · refreshes every 10 s</div>
+    </div>
+    <div class="user">
+      <span>{{ request.user.username }}{% if user_type %} · {{ user_type }}{% endif %}</span>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Sign out</button>
+      </form>
+    </div>
+  </header>
+
+  <div class="card banner" id="banner" role="alert"></div>
+
+  <section class="tiles">
+    <div class="card tile"><div class="label">Mobile bases</div><div class="value" id="t-bases">–</div><div class="hint">on the line</div></div>
+    <div class="card tile"><div class="label">Components assembled</div><div class="value" id="t-components">–</div><div class="hint">all time</div></div>
+    <div class="card tile"><div class="label">QA pass rate</div><div class="value" id="t-pass">–</div><div class="hint" id="t-pass-hint">no checks yet</div></div>
+    <div class="card tile"><div class="label">Waiting for cloud</div><div class="value" id="t-cloud">–</div><div class="hint">pending + failed entries</div></div>
+  </section>
+
+  <section class="panels">
+    <div class="card"><h2>Line status</h2><div id="p-status"></div></div>
+    <div class="card"><h2>QA results</h2><div id="p-qa"></div></div>
+    <div class="card"><h2>Cloud sync</h2><div id="p-cloud"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>Mobile bases</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Mobile base</th><th>Status</th>
+            <th class="num">Components</th><th class="num">QA pass</th><th class="num">QA fail</th>
+            <th>Last update</th>
+          </tr>
+        </thead>
+        <tbody id="bases"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  const REFRESH_MS = 10000;
+
+  // value -> [label, status class, icon]
+  const STATES = {
+    status: {
+      RUNNING:   ["Running",   "info",     "▶"],
+      COMPLETED: ["Completed", "good",     "✓"],
+      ERROR:     ["Error",     "critical", "✕"],
+      UNKNOWN:   ["No SCADA status", "neutral", "?"],
+    },
+    qa: {
+      PASS: ["Pass", "good",     "✓"],
+      FAIL: ["Fail", "critical", "✕"],
+    },
+    cloud: {
+      SENT:    ["Sent",    "good",     "✓"],
+      PENDING: ["Pending", "warning",  "…"],
+      FAILED:  ["Failed",  "critical", "✕"],
+    },
+  };
+
+  function el(tag, props = {}, children = []) {
+    const node = Object.assign(document.createElement(tag), props);
+    node.append(...children);
+    return node;
+  }
+
+  function badge(states, value) {
+    const [label, cls, icon] = states[value] || [value, "neutral", "?"];
+    return el("span", { className: "pill" }, [
+      el("span", { className: `icon ${cls}`, textContent: icon, ariaHidden: "true" }),
+      label,
+    ]);
+  }
+
+  // Part-to-whole bar + legend with counts, so colour never carries meaning alone.
+  function renderBreakdown(target, states, counts) {
+    const container = document.getElementById(target);
+    const entries = Object.entries(counts);
+    const total = entries.reduce((sum, [, n]) => sum + n, 0);
+    if (!total) {
+      container.replaceChildren(el("p", { className: "empty", textContent: "No data yet" }));
+      return;
+    }
+    const bar = el("div", { className: "bar", role: "img" });
+    const legend = el("ul", { className: "legend" });
+    const parts = [];
+    for (const [value, n] of entries) {
+      const [label, cls] = states[value] || [value, "neutral"];
+      const pct = Math.round((n / total) * 100);
+      parts.push(`${label} ${n}`);
+      if (n) {
+        bar.append(el("span", {
+          title: `${label}: ${n} (${pct}%)`,
+          style: `flex-grow:${n}; background:var(--${cls === "info" ? "accent" : cls})`,
+        }));
+      }
+      legend.append(el("li", {}, [badge(states, value), el("span", { className: "count", textContent: `${n} · ${pct}%` })]));
+    }
+    bar.setAttribute("aria-label", parts.join(", "));
+    container.replaceChildren(bar, legend);
+  }
+
+  function render(data) {
+    const s = data.summary;
+    const qaTotal = s.qa.PASS + s.qa.FAIL;
+    document.getElementById("t-bases").textContent = s.mobile_bases;
+    document.getElementById("t-components").textContent = s.components_assembled;
+    document.getElementById("t-pass").textContent = qaTotal ? `${Math.round((s.qa.PASS / qaTotal) * 100)}%` : "–";
+    document.getElementById("t-pass-hint").textContent = qaTotal ? `${s.qa.PASS} of ${qaTotal} checks` : "no checks yet";
+    document.getElementById("t-cloud").textContent = s.cloud_sync.PENDING + s.cloud_sync.FAILED;
+
+    renderBreakdown("p-status", STATES.status, s.status);
+    renderBreakdown("p-qa", STATES.qa, s.qa);
+    renderBreakdown("p-cloud", STATES.cloud, s.cloud_sync);
+
+    const rows = data.mobile_bases.map((b) => el("tr", {}, [
+      el("td", { textContent: b.MobileBaseID }),
+      el("td", {}, [badge(STATES.status, b.current_status)]),
+      el("td", { className: "num", textContent: b.components_assembled }),
+      el("td", { className: "num", textContent: b.qa.PASS }),
+      el("td", { className: "num", textContent: b.qa.FAIL }),
+      el("td", { textContent: new Date(b.updated_at).toLocaleString() }),
+    ]));
+    if (!rows.length) {
+      rows.push(el("tr", {}, [el("td", { colSpan: 6, className: "empty", textContent: "No mobile bases yet" })]));
+    }
+    document.getElementById("bases").replaceChildren(...rows);
+  }
+
+  async function refresh() {
+    const banner = document.getElementById("banner");
+    try {
+      const response = await fetch("{% url 'dashboard_data' %}", { credentials: "same-origin" });
+      if (response.status === 401 || response.status === 403) {
+        window.location.href = "{% url 'login' %}";
+        return;
+      }
+      if (!response.ok) throw new Error(`Server returned ${response.status}`);
+      render(await response.json());
+      banner.classList.remove("show");
+      document.getElementById("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    } catch (err) {
+      banner.textContent = `Could not load dashboard data: ${err.message}. Retrying…`;
+      banner.classList.add("show");
+    }
+  }
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+</script>
+{% endblock %}

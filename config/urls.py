@@ -16,8 +16,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path,include
+from django.views.generic import RedirectView
+
+from assembly.views import dashboard_page
+
+admin.site.site_header = "Mobile Manufacturing Assembly & QA Platform"
+admin.site.site_title = "Assembly & QA Platform admin"
+admin.site.index_title = "Factory data"
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("api/", include("assembly.urls")),
+    path("accounts/", include("django.contrib.auth.urls")),
+    path("dashboard/", dashboard_page, name="dashboard"),
+    path("", RedirectView.as_view(pattern_name="dashboard")),
 ]

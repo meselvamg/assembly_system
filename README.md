@@ -1,4 +1,6 @@
-# Mobile Assembly System (PRJ21.2)
+# Mobile Manufacturing Assembly & QA Platform
+
+> PRJ21.2 (Mobile Assembly System) of the PRJ21 mobile manufacturing spec.
 
 Backend for a mobile phone assembly line. It records every step a phone goes through (component assembly, QA verification, SCADA line status), reports that data to a central cloud with retries, and exposes a monitoring dashboard API. Access is controlled with token authentication and four user roles.
 
@@ -129,6 +131,10 @@ Payload sent to the cloud:
 }
 ```
 
+## Monitoring dashboard
+
+Open `http://127.0.0.1:8000/` and sign in with any factory account. The page shows mobile bases, components assembled, QA pass rate, cloud backlog, line status / QA / cloud sync breakdowns and a per-base table, refreshing every 10 seconds from `/api/dashboard_data/`. It uses Django session login (`/accounts/login/`), so no token is needed in the browser.
+
 ## Database schema
 
 | Table | Columns |
@@ -162,7 +168,7 @@ Events and errors are written to the console and to `logs/assembly.log` (rotated
 python manage.py test assembly
 ```
 
-22 tests cover every endpoint: valid and invalid input, role checks, token login, cloud push success, failure and retry, and the dashboard summary.
+25 tests cover every endpoint: valid and invalid input, role checks, token login, cloud push success, failure and retry, the dashboard summary, and the dashboard page login flow.
 
 ## Project structure
 
@@ -179,6 +185,9 @@ assembly/
   urls.py            API routes
   admin.py           Admin pages
   tests.py           Test suite
+  templates/
+    assembly/        Dashboard page and shared base layout
+    registration/    Login page
   management/commands/
     create_factory_user.py
     retry_cloud_sync.py
@@ -186,4 +195,4 @@ assembly/
 
 ## Part of PRJ21
 
-This repository is **PRJ21.2: Mobile Assembly System**. PRJ21.1 (Component Manufacturing) and PRJ21.3 (Centralized Cloud) are separate projects.
+This repository, the **Mobile Manufacturing Assembly & QA Platform**, implements **PRJ21.2: Mobile Assembly System**. PRJ21.1 (Component Manufacturing) and PRJ21.3 (Centralized Cloud) are separate projects.

@@ -239,3 +239,27 @@ class DashboardDataTests(TestCase):
 
     def test_dashboard_requires_login(self):
         self.assertEqual(APIClient().get("/api/dashboard_data/").status_code, 401)
+
+
+class DashboardPageTests(TestCase):
+    def test_redirects_to_login_when_signed_out(self):
+        response = self.client.get("/dashboard/")
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].startswith("/accounts/login/"))
+
+    def test_login_then_dashboard_and_data(self):
+        make_user("sup", "SUPERVISOR")
+        response = self.client.post("/accounts/login/", {"username": "sup", "password": "pass1234"})
+        self.assertRedirects(response, "/dashboard/")
+
+        page = self.client.get("/dashboard/")
+        self.assertContains(page, "Mobile Manufacturing Assembly &amp; QA Platform")
+        self.assertContains(page, "Supervisor")
+
+        # the page's JavaScript reads the API with the same session cookie
+        self.assertEqual(self.client.get("/api/dashboard_data/").status_code, 200)
+
+    def test_wrong_password_shows_error(self):
+        make_user("sup", "SUPERVISOR")
+        response = self.client.post("/accounts/login/", {"username": "sup", "password": "wrong"})
+        self.assertContains(response, "Invalid username or password.")
