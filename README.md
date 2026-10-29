@@ -39,6 +39,7 @@ All settings have safe local defaults; production values come from environment v
 | `DJANGO_SECRET_KEY` | dev-only key | **Required** when `DJANGO_DEBUG=0`; the app refuses to start without it |
 | `DJANGO_ALLOWED_HOSTS` | empty | Comma-separated hostnames, e.g. `myapp.onrender.com` |
 | `CLOUD_API_URL` | empty | Cloud endpoint for `report_to_cloud`. Empty means entries are stored as `PENDING` and not sent |
+| `CORS_ALLOWED_ORIGINS` | `http://127.0.0.1:5500,http://localhost:5500` | Comma-separated origins of the frontend allowed to call `/api/` |
 
 Generate a secret key with:
 ```bash
@@ -131,6 +132,25 @@ Payload sent to the cloud:
 }
 ```
 
+## Frontend (operator UI)
+
+`frontend/` is a separate plain HTML/CSS/JS app (no build step) that factory users work in. It signs in with `/api/authorize_user/`, keeps the token for the browser tab, and shows only the screens the user's role may use:
+
+| Screen | Roles | Calls |
+|---|---|---|
+| Assemble | Operator, Supervisor | `assemble_component` |
+| QA check | Technician, Engineer, Supervisor | `verify_component` |
+| Line status | Technician, Engineer, Supervisor | `scada_integration` |
+| Cloud report | Engineer, Supervisor | `report_to_cloud` |
+| Dashboard | everyone | `dashboard_data` (auto-refresh every 10 s) |
+
+Run it next to the backend:
+```bash
+python manage.py runserver                                   # terminal 1: API on :8000
+python -m http.server 5500 --bind 127.0.0.1 --directory frontend   # terminal 2: UI on :5500
+```
+Open `http://127.0.0.1:5500`. The API address is set in `frontend/config.js`; the backend only accepts browser calls from origins in `CORS_ALLOWED_ORIGINS` (default `http://127.0.0.1:5500,http://localhost:5500`).
+
 ## Monitoring dashboard
 
 Open `http://127.0.0.1:8000/` and sign in with any factory account. The page shows mobile bases, components assembled, QA pass rate, cloud backlog, line status / QA / cloud sync breakdowns and a per-base table, refreshing every 10 seconds from `/api/dashboard_data/`. It uses Django session login (`/accounts/login/`), so no token is needed in the browser.
@@ -168,11 +188,16 @@ Events and errors are written to the console and to `logs/assembly.log` (rotated
 python manage.py test assembly
 ```
 
-25 tests cover every endpoint: valid and invalid input, role checks, token login, cloud push success, failure and retry, the dashboard summary, and the dashboard page login flow.
+28 tests cover every endpoint: valid and invalid input, role checks, token login, cloud push success, failure and retry, the dashboard summary, the dashboard page login flow, and CORS for the frontend.
 
 ## Project structure
 
 ```
+frontend/
+  index.html         Operator UI shell (sign in + tabs)
+  app.js             Screens, API calls, dashboard
+  styles.css         Layout, light/dark colours
+  config.js          Backend API address
 config/
   settings.py        DRF, auth, cloud, logging and security settings
   urls.py            /admin/ and /api/
@@ -181,6 +206,7 @@ assembly/
   serializers.py     Request validation and field mapping (MobileBaseID -> mobile_base_id)
   views.py           API endpoints
   permissions.py     Role-based access (role_required)
+  middleware.py      CORS for the separate frontend
   cloud.py           Cloud payload builder and HTTP push with retries
   urls.py            API routes
   admin.py           Admin pages

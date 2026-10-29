@@ -263,3 +263,33 @@ class DashboardPageTests(TestCase):
         make_user("sup", "SUPERVISOR")
         response = self.client.post("/accounts/login/", {"username": "sup", "password": "wrong"})
         self.assertContains(response, "Invalid username or password.")
+
+
+@override_settings(CORS_ALLOWED_ORIGINS=["http://127.0.0.1:5500"])
+class FrontendCorsTests(TestCase):
+    def test_preflight_from_frontend_is_allowed(self):
+        response = self.client.options(
+            "/api/assemble_component/",
+            headers={"Origin": "http://127.0.0.1:5500", "Access-Control-Request-Method": "POST"},
+        )
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response["Access-Control-Allow-Origin"], "http://127.0.0.1:5500")
+        self.assertIn("Authorization", response["Access-Control-Allow-Headers"])
+
+    def test_api_response_carries_cors_header(self):
+        make_user("operator", "OPERATOR")
+        response = self.client.post(
+            "/api/authorize_user/",
+            {"Username": "operator", "Password": "pass1234"},
+            content_type="application/json",
+            headers={"Origin": "http://127.0.0.1:5500"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Access-Control-Allow-Origin"], "http://127.0.0.1:5500")
+
+    def test_other_origin_gets_no_cors_header(self):
+        response = self.client.options(
+            "/api/assemble_component/",
+            headers={"Origin": "http://evil.example", "Access-Control-Request-Method": "POST"},
+        )
+        self.assertNotIn("Access-Control-Allow-Origin", response)

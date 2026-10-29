@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mobile Manufacturing Assembly &amp; QA Platform</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Sign in -->
+  <main id="login-view" class="login" hidden>
+    <form id="login-form" class="card login-card">
+      <h1>Mobile Manufacturing Assembly &amp; QA Platform</h1>
+      <p class="muted">Sign in with your factory account</p>
+      <label class="field">
+        <span>Username</span>
+        <input name="Username" autocomplete="username" required autofocus>
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input name="Password" type="password" autocomplete="current-password" required>
+      </label>
+      <p id="login-error" class="message error" role="alert" hidden></p>
+      <button class="primary wide" type="submit">Sign in</button>
+    </form>
+  </main>
+
+  <!-- Signed in -->
+  <div id="app-view" hidden>
+    <header class="topbar">
+      <div class="brand">Mobile Manufacturing Assembly &amp; QA Platform</div>
+      <div class="who">
+        <span id="who-name"></span>
+        <span id="who-role" class="role"></span>
+        <button id="logout" type="button">Sign out</button>
+      </div>
+    </header>
+    <nav id="tabs" class="tabs" role="tablist"></nav>
+    <main id="panel" class="panel"></main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
