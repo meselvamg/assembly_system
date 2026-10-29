@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .cloud import send_to_cloud
-from .models import AssemblyLog, CloudData, MacMini, MobileBase, QALog, SCADALog, UserProfile
+from .models import AssemblyLog, CloudData, MobileBase, QALog, SCADALog, UserProfile
 
 
 def make_user(username, user_type, password="pass1234"):
@@ -166,41 +166,6 @@ class SendToCloudRetryTests(TestCase):
         self.assertEqual(mock_urlopen.call_count, 2)
 
 
-class IntegrateWithCloudTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.client.force_authenticate(make_user("engineer", "ENGINEER"))
-        self.url = "/api/integrate_with_cloud/"
-
-    def test_new_mac_mini_is_registered(self):
-        response = self.client.post(self.url, {"MacMiniID": "MAC01", "AssemblyAreaID": "AREA-A"}, format="json")
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["status"], "Success")
-        mac_mini = MacMini.objects.get(mac_mini_id="MAC01")
-        self.assertEqual(mac_mini.assembly_area_id, "AREA-A")
-        self.assertEqual(mac_mini.cloud_integration_status, "INTEGRATED")
-
-    def test_existing_mac_mini_moves_area(self):
-        MacMini.objects.create(mac_mini_id="MAC01", assembly_area_id="AREA-A", cloud_integration_status="DISCONNECTED")
-        response = self.client.post(self.url, {"MacMiniID": "MAC01", "AssemblyAreaID": "AREA-B"}, format="json")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(MacMini.objects.count(), 1)
-        mac_mini = MacMini.objects.get()
-        self.assertEqual(mac_mini.assembly_area_id, "AREA-B")
-        self.assertEqual(mac_mini.cloud_integration_status, "INTEGRATED")
-
-    def test_missing_area_returns_400(self):
-        response = self.client.post(self.url, {"MacMiniID": "MAC01"}, format="json")
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["status"], "Failure")
-        self.assertEqual(MacMini.objects.count(), 0)
-
-    def test_operator_cannot_integrate(self):
-        self.client.force_authenticate(make_user("operator", "OPERATOR"))
-        response = self.client.post(self.url, {"MacMiniID": "MAC01", "AssemblyAreaID": "AREA-A"}, format="json")
-        self.assertEqual(response.status_code, 403)
-
-
 class AuthorizationTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -271,12 +236,6 @@ class DashboardDataTests(TestCase):
         self.assertEqual(base["MobileBaseID"], "MB001")
         self.assertEqual(base["components_assembled"], 2)
         self.assertEqual(base["qa"], {"PASS": 1, "FAIL": 1})
-
-    def test_dashboard_lists_assembly_areas(self):
-        MacMini.objects.create(mac_mini_id="MAC01", assembly_area_id="AREA-A")
-        response = self.client.get("/api/dashboard_data/")
-        self.assertEqual(response.data["summary"]["mac_minis"]["INTEGRATED"], 1)
-        self.assertEqual(response.data["assembly_areas"][0]["AssemblyAreaID"], "AREA-A")
 
     def test_dashboard_requires_login(self):
         self.assertEqual(APIClient().get("/api/dashboard_data/").status_code, 401)

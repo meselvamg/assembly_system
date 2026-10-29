@@ -10,13 +10,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from .cloud import ENTRY_SOURCES, build_payload, send_to_cloud
-from .models import AssemblyLog, CloudData, MacMini, MobileBase, QALog, SCADALog
+from .models import AssemblyLog, CloudData, MobileBase, QALog, SCADALog
 from .permissions import role_required
 from .serializers import (
     AssemblyLogSerializer,
     CloudReportSerializer,
     LoginSerializer,
-    MacMiniSerializer,
     QALogSerializer,
     SCADALogSerializer,
 )
@@ -124,34 +123,6 @@ def report_to_cloud(request):
 
 
 @api_view(["POST"])
-@permission_classes([role_required("ENGINEER", "SUPERVISOR")])
-def integrate_with_cloud(request):
-    serializer = MacMiniSerializer(data=request.data)
-
-    if not serializer.is_valid():
-        logger.warning("integrate_with_cloud rejected: %s", serializer.errors)
-        return failure(serializer.errors)
-
-    mac_mini, created = MacMini.objects.update_or_create(
-        mac_mini_id=serializer.validated_data["mac_mini_id"],
-        defaults={
-            "assembly_area_id": serializer.validated_data["assembly_area_id"],
-            "cloud_integration_status": "INTEGRATED",
-        },
-    )
-
-    logger.info(
-        "Mac mini %s %s for area %s",
-        mac_mini.mac_mini_id, "registered" if created else "re-integrated", mac_mini.assembly_area_id,
-    )
-    return Response(
-        {"status": "Success", "message": "Mac mini integrated with cloud",
-         "mac_mini_id": mac_mini.mac_mini_id, "assembly_area_id": mac_mini.assembly_area_id},
-        status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
-    )
-
-
-@api_view(["POST"])
 @authentication_classes([])
 @permission_classes([AllowAny])
 def authorize_user(request):
@@ -213,16 +184,6 @@ def dashboard_data(request):
             "components_assembled": AssemblyLog.objects.count(),
             "qa": count_by(QALog.objects, "verification_status", QALog.VERIFICATION_CHOICES),
             "cloud_sync": count_by(CloudData.objects, "sync_status", CloudData.SYNC_CHOICES),
-            "mac_minis": count_by(MacMini.objects, "cloud_integration_status", MacMini.INTEGRATION_CHOICES),
         },
-        "assembly_areas": [
-            {
-                "AssemblyAreaID": mac_mini.assembly_area_id,
-                "MacMiniID": mac_mini.mac_mini_id,
-                "cloud_integration_status": mac_mini.cloud_integration_status,
-                "last_sync_time": mac_mini.last_sync_time,
-            }
-            for mac_mini in MacMini.objects.order_by("assembly_area_id")
-        ],
         "mobile_bases": bases,
     })

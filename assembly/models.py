@@ -73,23 +73,6 @@ class CloudData(models.Model):
         return f"{self.mobile_base_id} - {self.entry_type} - {self.sync_status}"
 
 
-class MacMini(models.Model):
-    INTEGRATION_CHOICES = [
-        ('INTEGRATED', 'Integrated'),
-        ('DISCONNECTED', 'Disconnected'),
-    ]
-
-    mac_mini_id = models.CharField(max_length=50, unique=True)
-    assembly_area_id = models.CharField(max_length=50)
-    cloud_integration_status = models.CharField(
-        max_length=12, choices=INTEGRATION_CHOICES, default='INTEGRATED'
-    )
-    last_sync_time = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"{self.mac_mini_id} - {self.assembly_area_id} - {self.cloud_integration_status}"
-
-
 class UserProfile(models.Model):
     USER_TYPE_CHOICES = [
         ('SUPERVISOR', 'Supervisor'),
